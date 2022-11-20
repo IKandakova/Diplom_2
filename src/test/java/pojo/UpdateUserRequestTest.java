@@ -1,9 +1,13 @@
 package pojo;
+
+import io.qameta.allure.Description;
 import io.qameta.allure.Step;
 import io.qameta.allure.junit4.DisplayName;
 import io.restassured.response.Response;
+import org.junit.After;
 import org.junit.Test;
-import object.UserObject;
+import pageobject.UserPageObject;
+
 import static config.Config.getBaseUri;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
@@ -11,53 +15,56 @@ import static org.hamcrest.Matchers.notNullValue;
 import static testdata.UpdateUserRequestTestData.getUserRequestAllUpdateRequiredField;
 import static testdata.UserRequestTestData.getUserRequestAllRequiredField;
 
-
 public class UpdateUserRequestTest {
+	UserPageObject userPageObject;
+	UserRequest userRequest;
+	String accessToken;
+	UpdateUserRequest updateUserRequest;
 
+	@After
+	public void deleteUser() {
+		if (accessToken != null) {
+			userPageObject.delete(accessToken);
+		}
+	}
 
-    @Test
-    @DisplayName("Changing user data with authorization")
-    @Step("Checking the user data change: the request returns the response code 200 and success: true")
-    public void updateUserWithAuth() {
-        UserObject userObject = new UserObject();
-        UserRequest userRequest = getUserRequestAllRequiredField();
+	@Test
+	@DisplayName("Changing user data with authorization")
+	@Description("Checking the user data change: the request returns the response code 200 and success: true")
+	public void updateUserWithAuth() {
+		userPageObject = new UserPageObject();
+		userRequest = getUserRequestAllRequiredField();
+		accessToken = userPageObject.create(userRequest)
+				.then()
+				.assertThat()
+				.statusCode(200)
+				.and()
+				.body("accessToken", notNullValue())
+				.extract()
+				.path("accessToken");
 
-        String accessToken = userObject.create(userRequest)
-                .then()
-                .assertThat()
-                .statusCode(200)
-                .and()
-                .body("accessToken", notNullValue())
-                .extract()
-                .path("accessToken");
+		updateUserRequest = getUserRequestAllUpdateRequiredField();
+		Response response = userPageObject.updateWithAuth(updateUserRequest, accessToken);
+		response.then()
+				.statusCode(200)
+				.and()
+				.assertThat().body("success", equalTo(true));
+	}
 
-        UpdateUserRequest updateUserRequest = getUserRequestAllUpdateRequiredField();
-        Response response= userObject.updateWithAuth(updateUserRequest, accessToken);
-        response.then()
-                .statusCode(200)
-                .and()
-                .assertThat().body("success", equalTo(true));
-
-        userObject.delete(accessToken);
-    }
-
-
-        @Test
-        @DisplayName("Changing user data without authorization")
-        @Step("Checking the user data change: the request returns the 401 response code and message: You should be authorized")
-        public void updateUserWithoutAuth() {
-            UpdateUserRequest updateUserRequest = getUserRequestAllUpdateRequiredField();
-
-            Response response =
-                    given()
-                            .header("Content-type", "application/json")
-                            .baseUri(getBaseUri())
-                            .body(updateUserRequest)
-                            .patch("auth/user");
-            response.then()
-                    .statusCode(401)
-                    .and()
-                    .assertThat().body("message", equalTo("You should be authorised"));
-        }
-
+	@Test
+	@DisplayName("Changing user data without authorization")
+	@Description("Checking the user data change: the request returns the 401 response code and message: You should be authorized")
+	public void updateUserWithoutAuth() {
+		updateUserRequest = getUserRequestAllUpdateRequiredField();
+		Response response =
+				given()
+						.header("Content-type", "application/json")
+						.baseUri(getBaseUri())
+						.body(updateUserRequest)
+						.patch("auth/user");
+		response.then()
+				.statusCode(401)
+				.and()
+				.assertThat().body("message", equalTo("You should be authorised"));
+	}
 }
